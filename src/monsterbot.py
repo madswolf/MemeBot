@@ -1,4 +1,5 @@
 import discord
+from discord.ext import commands
 import os
 from dotenv import load_dotenv
 import requests
@@ -6,10 +7,39 @@ from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw 
 import io
+import re
+
+randomPrefix = "madsmonster"
+uploadPrefix = "upload"
+
+apihost = "localhost"
+protocol = "http"
+
+contentFlags = {
+    "v" : "visualFile",
+    "t" : "toptext",
+    "b" : "bottomtext",
+    "s" : "soundFile",
+}
+
+contentPaths = {
+    'v': 'visuals',
+    't': 'toptexts',
+    'b': 'bottomtexts',
+    's': 'sounds',
+    'm': 'Upload/Memes'
+}
+
+visualFileExtensions = ["png","jpg","gif"]
+soundFileExtensions = ["mp3","wav"]
+typeToExtions = {
+    "visual" : visualFileExtensions,
+    "sound" : soundFileExtensions
+}
 
 load_dotenv()
 
-client = discord.Client()
+bot = commands.Bot(command_prefix='$')
 
 #shamelessly stolen from julian
 def split_line(text, font, width):
@@ -51,27 +81,88 @@ def draw_text(text,font,pos,max_size,drawer):
         drawer.text((pos[0], pos[1]+1), text, font=font, fill=(0,0,0))
         drawer.text((pos[0],pos[1]),text,(255,255,255),font=font)
 
-@client.event
+@bot.event
 async def on_ready():
-    print('We have logged in as {0.user}'.format(client))
+    print('We have logged in as {0.user}'.format(bot))
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
+async def extract(ctx,contentType):
+    if contentType == 't' or contentType == 'b' :
+        text = re.search("\".*?\"",ctx.message.content)
+        if not text.group(0):
+            await ctx.send("Error: Include \"\" the top or bottom text")
+            return None
 
-    if message.content.startswith('$madsmonster'):
+        text = text.group(0)
+        if len(text) > 100:
+            await ctx.send('Error: Text is too long')
+            return None
+
+        ctx.message.content = re.sub(text,"",ctx.message.content,1)
+        return text
+
+    elif contentType == 'v' or contentType == 's':
+        fp = io.BytesIO()
+        await ctx.message.attachments[0].save(fp)
+        return (ctx.message.attachments[0].filename,fp,ctx.message.attachments[0].content_type)
+    else:
+        await ctx.send('Error: No such content type' + contentType)
+        return None
+
+
+
+
+@bot.command()
+async def upload(ctx, contentType, *args):
+
+        files = {}
+        body = {}
+
+        if len(contentType) > 1: 
+            if 'v' not in contentType:
+                return await ctx.send('Error: Multipart memes must have a visual')
+            
+            #ugly adaption hack for mads.monster, it expects toptext and bottomtext to be "" if it's not included
+            body['toptext'] = ""
+            body['bottomtext'] = ""
+            path = contentPaths['m']
+
+        else:
+            path = contentPaths[contentType]
+
+        for flag in contentType:
+            content = await extract(ctx,flag)
+            if content == None:
+                return
+            if (flag == 'b' or flag == 't'):
+                body[contentFlags[flag]] = content
+            else:
+                files[contentFlags[flag]] = content
+
+
+        response = requests.post("{}://{}/{}".format(protocol,apihost,path),files=files,data=body)
+
+        if(response.status_code == 200):
+            ctx.send('Success')
+        else:
+            ctx.send('Error')
+        
+@bot.command()
+async def madsmonster(ctx):
         resp = requests.get("https://api.mads.monster/random/meme").json()
         img = Image.open(requests.get(resp["visual"], stream=True).raw)
+        if img.mode == "P":
+            img = img.convert('RGB')
         img = img.resize((400,400),Image.ANTIALIAS)
         drawer = ImageDraw.Draw(img)
         font = ImageFont.truetype("impact.ttf", 16)
+
         draw_text(resp["toptext"], font, (0, 25), (400, 50), drawer)
         draw_text(resp["bottomtext"], font, (0, 325), (400, 50), drawer)
 
         img_bytes = io.BytesIO()
         img.save(img_bytes, format="PNG")
         img_bytes.seek(0)
-        await message.channel.send(file=discord.File(img_bytes, "meme.png"))
+        await ctx.send(file=discord.File(img_bytes, "meme.png"))
 
-client.run(os.getenv('TOKEN'))
+
+bot.run(os.getenv('TOKEN'))
