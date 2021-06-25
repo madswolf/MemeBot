@@ -1,11 +1,11 @@
+import PIL
 import discord
+import random
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
 import requests
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw 
+from PIL import Image, ImageEnhance, ImageFont, ImageDraw 
 import io
 import re
 
@@ -108,6 +108,22 @@ async def extract(ctx,contentType):
         await ctx.send('Error: No such content type' + contentType)
         return None
 
+def randomize(img):
+    
+    chance = random.randint(0,3)
+    
+    if chance == 1:
+        print("brightened")
+        filter = ImageEnhance.Brightness(img)
+        img = filter.enhance(5)
+    elif chance == 2:
+        print("rotated")
+        img = img.rotate(90)
+    else:
+        print("flipped")
+        img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+    return img
+    
 
 
 
@@ -145,14 +161,20 @@ async def upload(ctx, contentType, *args):
             ctx.send('Success')
         else:
             ctx.send('Error')
+
+
         
 @bot.command()
-async def madsmonster(ctx):
+async def madsmonster(ctx,*args):
         resp = requests.get("https://api.mads.monster/random/meme").json()
         img = Image.open(requests.get(resp["visual"], stream=True).raw)
         if img.mode == "P":
             img = img.convert('RGB')
         img = img.resize((400,400),Image.ANTIALIAS)
+
+        if "-r" in args:
+            img = randomize(img)
+
         drawer = ImageDraw.Draw(img)
         font = ImageFont.truetype("impact.ttf", 16)
 
@@ -163,6 +185,7 @@ async def madsmonster(ctx):
         img.save(img_bytes, format="PNG")
         img_bytes.seek(0)
         await ctx.send(file=discord.File(img_bytes, "meme.png"))
+
 
 
 bot.run(os.getenv('TOKEN'))
