@@ -85,6 +85,9 @@ def draw_text(text,font,pos,max_size,drawer):
 async def on_ready():
     print('We have logged in as {0.user}'.format(bot))
 
+def openImageFromUrl(url):
+    return Image.open(io.BytesIO(requests.get(url).content))
+
 async def extract(ctx,contentType):
     if contentType == 't' or contentType == 'b' :
         text = re.search("\".*?\"",ctx.message.content)
@@ -110,15 +113,24 @@ async def extract(ctx,contentType):
 
 def randomize(img):
     
-    chance = random.randint(0,3)
+    chance = 0
     
-    if chance == 1:
+    if chance == 3:
         print("brightened")
         filter = ImageEnhance.Brightness(img)
         img = filter.enhance(5)
     elif chance == 2:
         print("rotated")
         img = img.rotate(90)
+    elif chance == 0:
+        print("test")
+        img = ImageEnhance.Brightness(img).enhance(5)
+        img = ImageEnhance.Sharpness(img).enhance(5)
+        img = ImageEnhance.Color(img).enhance(500)
+        emoji = openImageFromUrl("https://server.tobloef.com/faces/random.png")
+        emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+        emoji.resize((50,50),Image.ANTIALIAS)
+        img.paste(emoji,(250,50))
     else:
         print("flipped")
         img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
@@ -168,13 +180,15 @@ async def upload(ctx, contentType, *args):
 async def madsmonster(ctx,*args):
         resp = requests.get("https://api.mads.monster/random/meme").json()
         img = Image.open(requests.get(resp["visual"], stream=True).raw)
+        if "-s" in args:
+            img = openImageFromUrl("http://clown.mads.monster/capture")
         if img.mode == "P":
             img = img.convert('RGB')
         img = img.resize((400,400),Image.ANTIALIAS)
 
         if "-r" in args:
             img = randomize(img)
-
+        
         drawer = ImageDraw.Draw(img)
         font = ImageFont.truetype("impact.ttf", 16)
 
