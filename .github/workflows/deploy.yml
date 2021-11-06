@@ -1,0 +1,31 @@
+name: Build & Deploy
+on: 
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy monsterbot app
+      uses: appleboy/ssh-action@v0.1.4
+      with:
+        host: ${{secrets.SSH_HOST}}
+        key: ${{secrets.SSH_KEY}}
+        username: ${{secrets.SSH_USERNAME}}
+        script: |
+          sudo systemctl stop monsterbot.service
+          rm -rf monsterbot
+          mkdir monsterbot
+          cd monsterbot
+          git clone git@github.com:ChadIImus/MonsterBot.git
+          cd MonsterBot/src
+          echo TOKEN = ${{secrets.BOT_TOKEN}} > .env
+          python3 -m pip install pipreqs
+          python3 -m  pipreqs.pipreqs . --force
+          python3 -m pip install -r requirements.txt
+          cd ..
+          sudo cp monsterbot.service /etc/systemd/system/monsterbot.service
+          sudo systemctl daemon-reload
+          sudo systemctl start monsterbot.service
+          sudo systemctl enable monsterbot.service
