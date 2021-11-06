@@ -38,8 +38,9 @@ typeToExtions = {
 }
 
 load_dotenv()
+testing =  os.getenv('TESTING') == "True"
 
-bot = commands.Bot(command_prefix='$')
+bot = commands.Bot(command_prefix='$' if not testing else '?')
 
 #shamelessly stolen from julian
 def split_line(text, font, width):
@@ -88,14 +89,17 @@ async def on_ready():
 def openImageFromUrl(url):
     return Image.open(io.BytesIO(requests.get(url).content))
 
-async def extract(ctx,contentType):
+async def extract(ctx, contentType, strict):
     if contentType == 't' or contentType == 'b' :
         text = re.search("\".*?\"",ctx.message.content)
-        if not text.group(0):
-            await ctx.send("Error: Include \"\" the top or bottom text")
-            return None
+        if not text:
+            if strict:
+                await ctx.send("Error: Include the top or bottom text in \"\" ")
+                return None
+            else:
+                return ""
 
-        text = text.group(0)
+        text = text.group(0)[1:-1]
         if len(text) > 100:
             await ctx.send('Error: Text is too long')
             return None
@@ -104,11 +108,18 @@ async def extract(ctx,contentType):
         return text
 
     elif contentType == 'v' or contentType == 's':
+        if not ctx.message.attachments:
+            #TODO graceful fail proper return value for files
+            if strict:
+                await ctx.send("No visual or Sound file found")
+            return None
+
+        #TODO handle visual and sound at the same time
         fp = io.BytesIO()
         await ctx.message.attachments[0].save(fp)
-        return (ctx.message.attachments[0].filename,fp,ctx.message.attachments[0].content_type)
+        return (ctx.message.attachments[0].filename,fp, ctx.message.attachments[0].content_type)
     else:
-        await ctx.send('Error: No such content type' + contentType)
+        await ctx.send('Error: No such content type ' + contentType)
         return None
 
 def randomize(img):
@@ -135,15 +146,19 @@ def randomize(img):
         print("flipped")
         img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
     return img
-    
-
-
 
 @bot.command()
-async def upload(ctx, contentType, *args):
+async def upload(ctx, *args):
 
         files = {}
         body = {}
+        strict = True
+
+        if args and args[0].startswith("-"):
+            contentType = args[0][1:]
+        else: 
+            contentType = "vtb"
+            strict = False
 
         if len(contentType) > 1: 
             if 'v' not in contentType:
@@ -158,21 +173,26 @@ async def upload(ctx, contentType, *args):
             path = contentPaths[contentType]
 
         for flag in contentType:
-            content = await extract(ctx,flag)
+            content = await extract(ctx, flag, strict)
             if content == None:
-                return
+                if strict:
+                    await ctx.send('Error')
+                    return
+                else:
+                    break
             if (flag == 'b' or flag == 't'):
                 body[contentFlags[flag]] = content
             else:
                 files[contentFlags[flag]] = content
 
-
+        if len(contentType) > 1 and contentFlags['v'] not in files.keys():
+            return await ctx.send('Error: Multipart memes must have a visual')
         response = requests.post("{}://{}/{}".format(protocol,apihost,path),files=files,data=body)
 
         if(response.status_code == 200):
-            ctx.send('Success')
+            await ctx.send('Success')
         else:
-            ctx.send('Error')
+            await ctx.send('Error')
 
 
         
@@ -201,5 +221,5 @@ async def madsmonster(ctx,*args):
         await ctx.send(file=discord.File(img_bytes, "meme.png"))
 
 
-
+ImageFont.load_default()
 bot.run(os.getenv('TOKEN'))
