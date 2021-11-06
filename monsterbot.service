@@ -1,0 +1,13 @@
+[Unit]
+Description=Monsterbot
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory= /root/monsterbot/MonsterBot/src
+ExecStart=/usr/bin/python3 /root/monsterbot/MonsterBot/src/monsterbot.py
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
