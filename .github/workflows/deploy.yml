@@ -21,6 +21,8 @@ jobs:
           git clone git@github.com:ChadIImus/MonsterBot.git
           cd MonsterBot/src
           echo TOKEN = ${{secrets.BOT_TOKEN}} > .env
+          echo API_HOST = ${{secrets.API_HOST}} >> .env
+          echo PROTOCOL = ${{secrets.PROTOCOL}} >> .env
           python3 -m pip install pipreqs
           python3 -m  pipreqs.pipreqs . --force
           python3 -m pip install -r requirements.txt
