@@ -12,8 +12,6 @@ import re
 randomPrefix = "madsmonster"
 uploadPrefix = "upload"
 
-apihost = "localhost"
-protocol = "http"
 
 contentFlags = {
     "v" : "visualFile",
@@ -39,6 +37,8 @@ typeToExtions = {
 
 load_dotenv()
 testing =  os.getenv('TESTING') == "True"
+apihost = os.getenv("API_HOST")
+protocol = os.getenv("PROTOCOL")
 
 bot = commands.Bot(command_prefix='$' if not testing else '?')
 
@@ -187,7 +187,7 @@ async def upload(ctx, *args):
 
         if len(contentType) > 1 and contentFlags['v'] not in files.keys():
             return await ctx.send('Error: Multipart memes must have a visual')
-        response = requests.post("{}://{}/{}".format(protocol,apihost,path),files=files,data=body)
+        response = requests.post("{}://{}/{}".format(protocol,apihost,path),files=files , data=body)
 
         if(response.status_code == 200):
             await ctx.send('Success')
