@@ -35,6 +35,14 @@ typeToExtions = {
     "sound" : soundFileExtensions
 }
 
+emojiPositions = {
+    0: (250,50),
+    1: (50, 50),
+    2: (250, 250),
+    3: (50, 250),
+    4: (175, 175)
+}
+
 load_dotenv()
 testing =  os.getenv('TESTING') == "True"
 apihost = os.getenv("API_HOST")
@@ -122,31 +130,6 @@ async def extract(ctx, contentType, strict):
         await ctx.send('Error: No such content type ' + contentType)
         return None
 
-def randomize(img):
-    
-    chance = 0
-    
-    if chance == 3:
-        print("brightened")
-        filter = ImageEnhance.Brightness(img)
-        img = filter.enhance(5)
-    elif chance == 2:
-        print("rotated")
-        img = img.rotate(90)
-    elif chance == 0:
-        print("test")
-        img = ImageEnhance.Brightness(img).enhance(5)
-        img = ImageEnhance.Sharpness(img).enhance(5)
-        img = ImageEnhance.Color(img).enhance(500)
-        emoji = openImageFromUrl("https://server.tobloef.com/faces/random.png")
-        emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT)
-        emoji.resize((50,50),Image.ANTIALIAS)
-        img.paste(emoji,(250,50))
-    else:
-        print("flipped")
-        img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
-    return img
-
 @bot.command()
 async def upload(ctx, *args):
 
@@ -199,11 +182,13 @@ async def upload(ctx, *args):
 @bot.command()
 async def madsmonster(ctx,*args):
         resp = requests.get("https://api.mads.monster/random/meme").json()
+        print(resp["visual"])
         img = Image.open(requests.get(resp["visual"], stream=True).raw)
-        if "-s" in args:
-            img = openImageFromUrl("http://clown.mads.monster/capture")
         if img.mode == "P":
             img = img.convert('RGB')
+        
+        if "-s" in args:
+            img = openImageFromUrl("http://clown.mads.monster/capture")
         img = img.resize((400,400),Image.ANTIALIAS)
 
         if "-r" in args:
@@ -220,6 +205,35 @@ async def madsmonster(ctx,*args):
         img_bytes.seek(0)
         await ctx.send(file=discord.File(img_bytes, "meme.png"))
 
+
+def randomize(img):
+    
+    chance = 0
+    
+    if chance == 3:
+        print("brightened")
+        filter = ImageEnhance.Brightness(img)
+        img = filter.enhance(5)
+    elif chance == 2:
+        print("rotated")
+        img = img.rotate(90)
+    elif chance == 0:
+        print("test")
+        value = random.uniform(-1,1)
+        print("random value = ", value)
+        img = ImageEnhance.Brightness(img).enhance(abs(value) * 5)
+        img = ImageEnhance.Sharpness(img).enhance(abs(value) * 5)
+        img = ImageEnhance.Color(img).enhance(abs(value) * 10)
+        emoji = openImageFromUrl("https://server.tobloef.com/faces/random.png?exclude=A_Background")
+        emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT) if value < 0 else emoji
+        emoji = emoji.rotate(value * 180)
+        emoji.resize((50,50),Image.ANTIALIAS)
+        emoji_position = emojiPositions[abs(int(value * len(emojiPositions)))]
+        img.paste(emoji,(emoji_position[0] + int(value * 50),emoji_position[1] + int(value * 50)),emoji)
+    else:
+        print("flipped")
+        img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+    return img
 
 ImageFont.load_default()
 bot.run(os.getenv('TOKEN'))
