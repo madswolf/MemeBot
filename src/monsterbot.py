@@ -8,6 +8,7 @@ import requests
 from PIL import Image, ImageEnhance, ImageFont, ImageDraw 
 import io
 import re
+import math
 
 randomPrefix = "madsmonster"
 uploadPrefix = "upload"
@@ -95,7 +96,8 @@ async def on_ready():
     print('We have logged in as {0.user}'.format(bot))
 
 def openImageFromUrl(url):
-    return Image.open(io.BytesIO(requests.get(url).content))
+    response = requests.get(url)
+    return Image.open(io.BytesIO(response.content))
 
 async def extract(ctx, contentType, strict):
     if contentType == 't' or contentType == 'b' :
@@ -182,7 +184,6 @@ async def upload(ctx, *args):
 @bot.command()
 async def madsmonster(ctx,*args):
         resp = requests.get("https://api.mads.monster/random/meme").json()
-        print(resp["visual"])
         img = Image.open(requests.get(resp["visual"], stream=True).raw)
         if img.mode == "P":
             img = img.convert('RGB')
@@ -207,31 +208,20 @@ async def madsmonster(ctx,*args):
 
 
 def randomize(img):
+
+    value = random.uniform(-1,1)
+    img = ImageEnhance.Brightness(img).enhance(max(1, abs(value)) * 2)
+    img = ImageEnhance.Sharpness(img).enhance(abs(value) * 10)
+    img = ImageEnhance.Color(img).enhance(abs(value) * 10)
+    if value < 0:
+      emoji = openImageFromUrl("https://server.tobloef.com/faces/random.png?exclude=A_Background")
+      emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT) if value < 0 else emoji
+      emoji = emoji.rotate(value * 45)
+      emoji.resize((50,50),Image.ANTIALIAS)
+      emoji_position = emojiPositions[abs(int(value * len(emojiPositions)))]
+      img.paste(emoji,(emoji_position[0] + int(value * 50),emoji_position[1] + int(value * 50)),emoji)
     
-    chance = 0
-    
-    if chance == 3:
-        print("brightened")
-        filter = ImageEnhance.Brightness(img)
-        img = filter.enhance(5)
-    elif chance == 2:
-        print("rotated")
-        img = img.rotate(90)
-    elif chance == 0:
-        print("test")
-        value = random.uniform(-1,1)
-        print("random value = ", value)
-        img = ImageEnhance.Brightness(img).enhance(abs(value) * 5)
-        img = ImageEnhance.Sharpness(img).enhance(abs(value) * 5)
-        img = ImageEnhance.Color(img).enhance(abs(value) * 10)
-        emoji = openImageFromUrl("https://server.tobloef.com/faces/random.png?exclude=A_Background")
-        emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT) if value < 0 else emoji
-        emoji = emoji.rotate(value * 180)
-        emoji.resize((50,50),Image.ANTIALIAS)
-        emoji_position = emojiPositions[abs(int(value * len(emojiPositions)))]
-        img.paste(emoji,(emoji_position[0] + int(value * 50),emoji_position[1] + int(value * 50)),emoji)
-    else:
-        print("flipped")
+    if value > 0:
         img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
     return img
 
