@@ -8,7 +8,7 @@ import requests
 from PIL import Image, ImageEnhance, ImageFont, ImageDraw 
 import io
 import re
-import math
+import uuid
 
 randomPrefix = "madsmonster"
 uploadPrefix = "upload"
@@ -104,7 +104,7 @@ async def extract(ctx, contentType, strict):
         text = re.search("\".*?\"",ctx.message.content)
         if not text:
             if strict:
-                await ctx.send("Error: Include the top or bottom text in \"\" ")
+                await ctx.send("Error: Include the text in quotes like so: \"example\" ")
                 return None
             else:
                 return ""
@@ -178,22 +178,26 @@ async def upload(ctx, *args):
             await ctx.send('Success')
         else:
             await ctx.send('Error')
-
-
         
 @bot.command()
 async def madsmonster(ctx,*args):
         resp = requests.get("https://api.mads.monster/random/meme").json()
-        img = Image.open(requests.get(resp["visual"], stream=True).raw)
+        img = openImageFromUrl(resp["visual"])
         if img.mode == "P":
             img = img.convert('RGB')
         
-        if "-s" in args:
+        if "-o" in args:
             img = openImageFromUrl("http://clown.mads.monster/capture")
         img = img.resize((400,400),Image.ANTIALIAS)
 
         if "-r" in args:
-            img = randomize(img)
+            if "-s" in args:
+                result = await extract(ctx, "t", True)
+                if result == None:
+                    return
+                img = randomize(img, result)
+            else:
+                img = randomize(img)
         
         drawer = ImageDraw.Draw(img)
         font = ImageFont.truetype("impact.ttf", 16)
@@ -206,23 +210,43 @@ async def madsmonster(ctx,*args):
         img_bytes.seek(0)
         await ctx.send(file=discord.File(img_bytes, "meme.png"))
 
+def generateWithSeed(seed, function = random.uniform, params = (-1,1)):
+    random.seed(seed)
+    result = function(*params)
+    return result
 
-def randomize(img):
 
-    value = random.uniform(-1,1)
-    img = ImageEnhance.Brightness(img).enhance(max(1, abs(value)) * 2)
-    img = ImageEnhance.Sharpness(img).enhance(abs(value) * 10)
-    img = ImageEnhance.Color(img).enhance(abs(value) * 10)
-    if value < 0:
-      emoji = openImageFromUrl("https://server.tobloef.com/faces/random.png?exclude=A_Background")
-      emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT) if value < 0 else emoji
-      emoji = emoji.rotate(value * 45)
-      emoji.resize((50,50),Image.ANTIALIAS)
-      emoji_position = emojiPositions[abs(int(value * len(emojiPositions)))]
-      img.paste(emoji,(emoji_position[0] + int(value * 50),emoji_position[1] + int(value * 50)),emoji)
-    
-    if value > 0:
+def randomize(img, seed = None):
+    if seed == None:
+        seed =  str(uuid.uuid4())
+        
+    if generateWithSeed(seed + "mirror_image") < 0:
         img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+        
+    if generateWithSeed(seed + "deepfry") < 0:
+        img = ImageEnhance.Brightness(img).enhance(generateWithSeed(seed + "brightness", params= (1,2)))
+        img = ImageEnhance.Sharpness(img).enhance(generateWithSeed(seed + "sharpness", params= (1,20)))
+        img = ImageEnhance.Color(img).enhance(generateWithSeed(seed + "saturation", params= (1,10)))
+        
+    if generateWithSeed(seed + "emojify") < 0:
+      emoji = openImageFromUrl("https://server.tobloef.com/faces/{seed}.png?exclude=A_Background")
+      
+      emojiSize = generateWithSeed(seed + "emoji_size", random.randint, (-25,25))
+      emoji = emoji.resize((50 + emojiSize,50 + emojiSize), Image.ANTIALIAS)
+      
+      if generateWithSeed(seed + "mirror_emoji") < 0:  
+        emoji = emoji.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+      if generateWithSeed(seed + "rotate_emoji") < 0:  
+        emoji = emoji.rotate(generateWithSeed(seed + "emoji_rotation", params= (0,45)))
+        
+      emoji_position = emojiPositions[generateWithSeed(seed + "emoji_position", random.randint, (0, len(emojiPositions)-1))]
+      
+      emoji_position_x = emoji_position[0] + generateWithSeed(seed + "emoji_position_x", random.randint, (0, 50))
+      emoji_position_y = emoji_position[1] + generateWithSeed(seed + "emoji_position_y", random.randint, (0, 50))
+      emoji_position = (emoji_position_x, emoji_position_y)
+      
+      img.paste(emoji,emoji_position, emoji)
+
     return img
 
 ImageFont.load_default()
