@@ -229,7 +229,7 @@ def randomize(img, seed = None):
         img = ImageEnhance.Color(img).enhance(generateWithSeed(seed + "saturation", params= (1,10)))
         
     if generateWithSeed(seed + "emojify") < 0:
-      emoji = openImageFromUrl("https://server.tobloef.com/faces/{seed}.png?exclude=A_Background")
+      emoji = openImageFromUrl(f"https://server.tobloef.com/faces/{seed}.png?exclude=A_Background")
       
       emojiSize = generateWithSeed(seed + "emoji_size", random.randint, (-25,25))
       emoji = emoji.resize((50 + emojiSize,50 + emojiSize), Image.ANTIALIAS)
