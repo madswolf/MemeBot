@@ -114,7 +114,7 @@ async def extract(ctx, contentType, strict):
             await ctx.send('Error: Text is too long')
             return None
 
-        ctx.message.content = re.sub(text,"",ctx.message.content,1)
+        ctx.message.content = re.sub("\"" + text + "\"","",ctx.message.content,1)
         return text
 
     elif contentType == 'v' or contentType == 's':
@@ -172,6 +172,7 @@ async def upload(ctx, *args):
 
         if len(contentType) > 1 and contentFlags['v'] not in files.keys():
             return await ctx.send('Error: Multipart memes must have a visual')
+        print(body)
         response = requests.post("{}://{}/{}".format(protocol,apihost,path),files=files , data=body)
 
         if(response.status_code == 200):
@@ -181,7 +182,15 @@ async def upload(ctx, *args):
         
 @bot.command()
 async def madsmonster(ctx,*args):
-        resp = requests.get("https://api.mads.monster/random/meme").json()
+        seed = ""
+        if "-s" in args:
+            result =  await extract(ctx, "t", True)
+            if result == None:
+                return
+            seed = result
+            
+
+        resp = requests.get(f"https://api.mads.monster/random/meme/{seed}").json()
         img = openImageFromUrl(resp["visual"])
         if img.mode == "P":
             img = img.convert('RGB')
@@ -192,10 +201,7 @@ async def madsmonster(ctx,*args):
 
         if "-r" in args:
             if "-s" in args:
-                result = await extract(ctx, "t", True)
-                if result == None:
-                    return
-                img = randomize(img, result)
+                img = randomize(img, seed)
             else:
                 img = randomize(img)
         
