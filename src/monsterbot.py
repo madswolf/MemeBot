@@ -9,6 +9,8 @@ from PIL import Image, ImageEnhance, ImageFont, ImageDraw
 import io
 import re
 import uuid
+import numpy
+import cv2
 
 randomPrefix = "madsmonster"
 uploadPrefix = "upload"
@@ -48,6 +50,9 @@ load_dotenv()
 testing =  os.getenv('TESTING') == "True"
 apihost = os.getenv("API_HOST")
 protocol = os.getenv("PROTOCOL")
+
+faceCascade = cv2.CascadeClassifier("../resources/haarcascade_frontalface_default.xml")
+eyeCascade = cv2.CascadeClassifier("../resources/haarcascade_eye.xml")
 
 bot = commands.Bot(command_prefix='$' if not testing else '?')
 
@@ -97,7 +102,7 @@ async def on_ready():
 
 def openImageFromUrl(url):
     response = requests.get(url)
-    return Image.open(io.BytesIO(response.content))
+    return Image.open(io.BytesIO(response.content)) 
 
 async def extract(ctx, contentType, strict):
     if contentType == 't' or contentType == 'b' :
@@ -131,6 +136,41 @@ async def extract(ctx, contentType, strict):
     else:
         await ctx.send('Error: No such content type ' + contentType)
         return None
+
+def detect_faces(img):
+    print(img.mode)
+    img = numpy.array(img)
+    openCV_image =  cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+    faces = faceCascade.detectMultiScale(
+        openCV_image,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(30, 30)
+    )
+
+    eyes = eyeCascade.detectMultiScale(
+        openCV_image,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(30, 30)    
+    )
+
+    for (x,y,w,h) in faces:
+     cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+     roi_gray = openCV_image[y:y+h, x:x+w]
+     roi_color = img[y:y+h, x:x+w]
+     eyes = eyeCascade.detectMultiScale(roi_gray)
+     for (ex,ey,ew,eh) in eyes:
+         cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
+    cv2.imshow('adwa',img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    return (faces,eyes) 
+
+#return Image.fromarray(cv2.cvtColor(numpy.array(openCV_image), cv2.COLOR_BGR2RGB))
+
+
 
 @bot.command()
 async def upload(ctx, *args):
@@ -191,9 +231,7 @@ async def madsmonster(ctx,*args):
             
 
         resp = requests.get(f"https://api.mads.monster/random/meme/{seed}").json()
-        img = openImageFromUrl(resp["visual"])
-        if img.mode == "P":
-            img = img.convert('RGB')
+        img = (openImageFromUrl(resp["visual"])).convert('RGB')
         
         if "-o" in args:
             img = openImageFromUrl("http://clown.mads.monster/capture")
@@ -226,6 +264,7 @@ def randomize(img, seed = None):
     if seed == None:
         seed =  str(uuid.uuid4())
         
+    #print(detect_faces(img))
     if generateWithSeed(seed + "mirror_image") < 0:
         img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
         
